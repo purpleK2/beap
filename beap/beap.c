@@ -59,7 +59,7 @@ void *PREFIX(malloc)(size_t size)
     if (!beap_maj)
     {
 #ifdef HEAP_DEBUG
-        heap_debug("Initializing heap version %d.%d\n", HEAPVER_MAJOR,
+        heap_debug("Initializing beap version %d.%d\n", HEAPVER_MAJOR,
                    HEAPVER_MINOR);
 #endif
         beap_maj = beapmajor_init();
