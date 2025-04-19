@@ -49,6 +49,9 @@ int main(int argc, char **argv)
 
     printf("%s", str);
 
+    kfree(str);
+    free(pool);
+
 }
 
 int decStringToInt(char *str)
