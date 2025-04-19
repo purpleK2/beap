@@ -15,8 +15,8 @@
 #define HEAPMAGIC_AVAIL 0xC00DC00B // GOOD GOOB
 #define HEAPMAGIC_UNAV  0xDEADD00D // DEAD DOOD
 
-#define HEAPVER_MAJOR 0
-#define HEAPVER_MINOR 4
+#define HEAPVER_MAJOR 1
+#define HEAPVER_MINOR 0
 
 typedef struct beap_memnode_t {
     uint32_t magic;
