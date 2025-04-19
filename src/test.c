@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     double end = (double)clock() / CLOCKS_PER_SEC;
     printf("- %llu allocations took %lf seconds\n", allocations, end - start);
 
-    for (int i = 0; i < ALLOCS; i++)
+    for (int i = 0; i < allocations; i++)
     {
         kfree(pool[i]);
     }
