@@ -6,7 +6,7 @@ beap_maj_t *beap_maj = NULL;
 
 beap_maj_t *beapmajor_init()
 {
-    return heap_alloc(sizeof(beap_maj_t), NULL);
+    return beap_alloc(sizeof(beap_maj_t), NULL);
 }
 
 beap_memnode_t *heapnode_init(size_t size)
@@ -14,7 +14,7 @@ beap_memnode_t *heapnode_init(size_t size)
     beap_memnode_t *node;
 
     size_t actual;
-    node = heap_alloc(sizeof(beap_memnode_t) + size, &actual);
+    node = beap_alloc(sizeof(beap_memnode_t) + size, &actual);
 
     node->magic = HEAPMAGIC_AVAIL;
     node->len = actual - sizeof(beap_memnode_t);
@@ -54,18 +54,18 @@ bool heap_check_header(beap_memnode_t *node)
 
 void *PREFIX(malloc)(size_t size)
 {
-    heap_lock();
+    beap_lock();
 
     if (!beap_maj)
     {
 #ifdef BEAP_DEBUG
-        heap_debug("Initializing beap version %d.%d\n", HEAPVER_MAJOR,
+        beap_debug("Initializing beap version %d.%d\n", HEAPVER_MAJOR,
                    HEAPVER_MINOR);
 #endif
         beap_maj = beapmajor_init();
 
 #ifdef BEAP_DEBUG
-        heap_debug("Beap maj %p initialized OK\n", beap_maj);
+        beap_debug("Beap maj %p initialized OK\n", beap_maj);
 #endif
     }
 
@@ -75,13 +75,13 @@ void *PREFIX(malloc)(size_t size)
         beap_maj->root = root_node;
         beap_maj->last_checked = root_node;
 #ifdef BEAP_DEBUG
-        heap_debug("Root node %p(%#zx) initialized OK\n", beap_maj->root,
+        beap_debug("Root node %p(%#zx) initialized OK\n", beap_maj->root,
                    beap_maj->root->len);
 #endif
     }
 
 #ifdef BEAP_DEBUG
-    heap_debug("malloc(%#zx)\n", size);
+    beap_debug("malloc(%#zx)\n", size);
 #endif
 
     beap_memnode_t *cur;
@@ -90,13 +90,13 @@ void *PREFIX(malloc)(size_t size)
         if (!heap_check_header(cur))
         {
 #ifdef BEAP_DEBUG
-            heap_debug("Header %#lx is invalid\n", cur->magic);
+            beap_debug("Header %#lx is invalid\n", cur->magic);
 #endif
             return NULL;
         }
 
 #ifdef BEAP_DEBUG
-        heap_debug("Checking node %p\n", cur);
+        beap_debug("Checking node %p(%#zx)\n", cur, cur->len);
 #endif
 
         bool is_magic_available = (cur->magic == HEAPMAGIC_AVAIL);
@@ -109,7 +109,7 @@ void *PREFIX(malloc)(size_t size)
         }
 
 #ifdef BEAP_DEBUG
-        heap_debug("%p(%#zx) is already allocated\n", cur, cur->len);
+        beap_debug("%p(%#zx) is already allocated\n", cur, cur->len);
 #endif
 
         // here: either it's already allocated or it doesn't fit
@@ -119,7 +119,7 @@ void *PREFIX(malloc)(size_t size)
             beap_memnode_t *new = heapnode_init(size);
             cur->next = new;
 #ifdef BEAP_DEBUG
-            heap_debug("New node %p(%#zx) created\n", cur->next,
+            beap_debug("New node %p(%#zx) created\n", cur->next,
                        cur->next->len);
 #endif
         }
@@ -135,21 +135,21 @@ void *PREFIX(malloc)(size_t size)
         heap_split_node(cur, size);
 
 #ifdef BEAP_DEBUG
-        heap_debug("Node %p(%#zx) has been split: ->next=(%p;%#zx)\n", cur,
+        beap_debug("Node %p(%#zx) has been split: ->next=(%p;%#zx)\n", cur,
                    cur->len, cur->next, cur->next->len);
 #endif
     }
 
     cur->allocated = true;
 
-    heap_unlock();
+    beap_unlock();
 
     void *p = HEAP_ALIGN((void *)cur);
 
     memset(p, 0, size);
 
 #ifdef BEAP_DEBUG
-    heap_debug("Return %p\n", p);
+    beap_debug("Return %p\n", p);
 #endif
 
     return p;
@@ -158,7 +158,7 @@ void *PREFIX(malloc)(size_t size)
 void PREFIX(free)(void *ptr)
 {
 #ifdef BEAP_DEBUG
-    heap_debug("free(%p)\n", ptr);
+    beap_debug("free(%p)\n", ptr);
 #endif
 
     beap_memnode_t *deallocated = HEAP_UNALIGN(ptr);
@@ -166,7 +166,7 @@ void PREFIX(free)(void *ptr)
     if (!heap_check_header(deallocated))
     {
 #ifdef BEAP_DEBUG
-        heap_debug("%p doesn't have a valid header\n", ptr);
+        beap_debug("%p doesn't have a valid header\n", ptr);
 #endif
         return;
     }
@@ -176,11 +176,15 @@ void PREFIX(free)(void *ptr)
     if (!is_magic_allocated && !deallocated->allocated)
     {
 #ifdef BEAP_DEBUG
-        heap_debug("Node %p is not allocated\n", ptr);
+        beap_debug("Node %p is not allocated\n", ptr);
 #endif
         return;
     }
-    heap_lock();
+    beap_lock();
+
+#ifdef BEAP_DEBUG
+    beap_debug("Deallocating node %p\n", beap_maj->root);
+#endif
 
     deallocated->magic = HEAPMAGIC_AVAIL;
     deallocated->allocated = false;
@@ -189,30 +193,30 @@ void PREFIX(free)(void *ptr)
 
     // destroy the node
     beap_memnode_t *prev;
+    beap_memnode_t *next;
+    // is deallocated not the root node?
     if (deallocated != beap_maj->root)
     {
         for (prev = beap_maj->root; prev->next != deallocated;
              prev = prev->next)
             ;
-
-#ifdef BEAP_DEBUG
-        heap_debug("Found ->prev node %p\n", prev);
-#endif
+        
+        next = deallocated->next;
     }
     else
     {
+        // deallocated is maj->root
         prev = NULL;
+        next = root_node->next;
     }
-// deallocated is maj->root
 #ifdef BEAP_DEBUG
-    heap_debug("Deallocating node %p\n", beap_maj->root);
+        beap_debug("%p->prev = %p\n", deallocated, prev);
 #endif
-    beap_memnode_t *next = deallocated->next;
 
     if (prev)
     {
 #ifdef BEAP_DEBUG
-        heap_debug("prev(%p)->next(%p) is now %p\n", prev, prev->next, next);
+        beap_debug("deallocated(%p)->prev(%p)->next(%p) is now %p\n", deallocated, prev, prev->next, next);
 #endif
         prev->next = next;
 
@@ -221,29 +225,28 @@ void PREFIX(free)(void *ptr)
     else
     {
 #ifdef BEAP_DEBUG
-        heap_debug("root(%p)->next(%p) is now %p\n", beap_maj->root,
-                   beap_maj->root->next, next);
+        beap_debug("root(%p) is now %p\n", beap_maj->root,
+                   beap_maj->root->next);
 #endif
-        beap_maj->root->next = next;
-        beap_maj->root = beap_maj->root->next;
         root_node = root_node->next;
+        beap_maj->root = root_node;
 
         beap_maj->last_checked = root_node;
     }
 
     size_t tounmap_aligned =
         ROUND_UP(deallocated->len + sizeof(beap_memnode_t), BEAP_PAGE);
-    heap_dealloc(deallocated, tounmap_aligned / BEAP_PAGE);
+    beap_dealloc(deallocated, tounmap_aligned / BEAP_PAGE);
 #ifdef BEAP_DEBUG
-    heap_debug("node %p deallocated\n", deallocated);
+    beap_debug("node %p deallocated\n", deallocated);
 #endif
 
 #ifdef BEAP_DEBUG
-    heap_debug("Last checked node is %p(%d)\n", beap_maj->last_checked,
+    beap_debug("Last checked node is %p(%d)\n", beap_maj->last_checked,
                beap_maj->last_checked->allocated);
 #endif
 
-    heap_unlock();
+    beap_unlock();
 
     // we're done :D
 }
@@ -251,7 +254,7 @@ void PREFIX(free)(void *ptr)
 void *PREFIX(calloc)(size_t times, size_t size)
 {
 #ifdef BEAP_DEBUG
-    heap_debug("calloc(%#zx * %#zx)\n", times, size);
+    beap_debug("calloc(%#zx * %#zx)\n", times, size);
 #endif
     return PREFIX(malloc)(times * size);
 }
@@ -259,7 +262,7 @@ void *PREFIX(calloc)(size_t times, size_t size)
 void *PREFIX(realloc)(void *p_old, size_t size)
 {
 #ifdef BEAP_DEBUG
-    heap_debug("realloc(%p, %#zx)\n", p_old, size);
+    beap_debug("realloc(%p, %#zx)\n", p_old, size);
 #endif
 
     void *p_new = PREFIX(malloc)(size);

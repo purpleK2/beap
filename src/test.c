@@ -25,11 +25,7 @@ int main(int argc, char **argv)
 
     void **pool = malloc(sizeof(void*) * allocations);  // at least this one won't use beap just to be sure it's reliable
 
-    char *str = kcalloc(80, sizeof(char));
-    sprintf(str, "This string was allocated with beap :^)\n");
-
     double start = (double)clock() / CLOCKS_PER_SEC;
-
 
     for (int i = 0; i < allocations; i++)
     {
@@ -47,11 +43,12 @@ int main(int argc, char **argv)
     double end2 = (double)clock() / CLOCKS_PER_SEC;
     printf("- %llu deallocations took %lf seconds\n", allocations, end2 - end);
 
+    char *str = kcalloc(80, sizeof(char));
+    sprintf(str, "This string was allocated with beap :^)\n");
     printf("%s", str);
 
     kfree(str);
     free(pool);
-
 }
 
 int decStringToInt(char *str)

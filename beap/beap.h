@@ -20,7 +20,7 @@
 #define HEAPMAGIC_UNAV  0xDEADD00D // DEAD DOOD
 
 #define HEAPVER_MAJOR 2
-#define HEAPVER_MINOR 0
+#define HEAPVER_MINOR 1
 
 typedef struct beap_memnode_t {
     uint32_t magic;
@@ -40,7 +40,7 @@ typedef struct beap_maj_t {
 #define HEAP_ALIGN(p)   p + sizeof(beap_memnode_t)
 #define HEAP_UNALIGN(p) p - sizeof(beap_memnode_t)
 
-#define BEAP_PAGES 2 // default pages to allocate for root node
+#define BEAP_PAGES 1 // default pages to allocate for root node
 
 // NO WAY your fancy malloc stuff
 void *PREFIX(malloc)(size_t);
@@ -56,17 +56,17 @@ void *PREFIX(realloc)(void *p_old, size_t size);
 // asks the bottom-level MM <size> bytes (not page-aligned)
 // save the actually allocated size to <size_out> (might be NULL, and you
 // shouldn't save it in that case)
-void *heap_alloc(size_t size, size_t *size_out);
+void *beap_alloc(size_t size, size_t *size_out);
 // releases <pages> pages from a pointer to the same bottom-level MM
-void heap_dealloc(void *p, size_t pages);
+void beap_dealloc(void *p, size_t pages);
 
 // Locks/releases a spinlock/mutex/whatever you want
-void heap_lock();
-void heap_unlock();
+void beap_lock();
+void beap_unlock();
 
 // prints debug info (if HEAP_DEBUG is defined)
 #ifdef BEAP_DEBUG
-void heap_debug(const char *, ...);
+void beap_debug(const char *, ...);
 #endif
 
 // your usual mem*** functions, if you're a sane person you should have these

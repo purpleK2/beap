@@ -17,7 +17,7 @@ static pthread_mutex_t BEAP_LOCK = PTHREAD_MUTEX_INITIALIZER;
 
 unsigned long long page_size = 0x1000;
 
-void *heap_alloc(size_t size, size_t *size_out)
+void *beap_alloc(size_t size, size_t *size_out)
 {
     size_t aligned = ROUND_UP(size, page_size);
     if (size_out)
@@ -28,22 +28,22 @@ void *heap_alloc(size_t size, size_t *size_out)
     return (page == MAP_FAILED) ? NULL : page;
 }
 
-void heap_dealloc(void *p, size_t pages)
+void beap_dealloc(void *p, size_t pages)
 {
     munmap(p, pages * page_size);
 }
 
 // Locks/releases a spinlock/mutex/whatever you want
-void heap_lock()
+void beap_lock()
 {
     pthread_mutex_lock(&BEAP_LOCK);
 }
-void heap_unlock()
+void beap_unlock()
 {
     pthread_mutex_unlock(&BEAP_LOCK);
 }
 
-void heap_debug(const char *fmt, ...)
+void beap_debug(const char *fmt, ...)
 {
     char buffer[1024];
     va_list args;
