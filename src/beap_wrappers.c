@@ -43,7 +43,6 @@ void heap_unlock()
     pthread_mutex_unlock(&BEAP_LOCK);
 }
 
-#ifdef HEAP_DEBUG
 void heap_debug(const char *fmt, ...)
 {
     char buffer[1024];
@@ -60,4 +59,3 @@ void heap_debug(const char *fmt, ...)
 
     printf("[ heap::DEBUG ] %s", buffer);
 }
-#endif
