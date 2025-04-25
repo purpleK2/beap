@@ -5,7 +5,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include "../beap/beap.h"
+#include <beap.h>
 
 static pthread_mutex_t allocator_lock = PTHREAD_MUTEX_INITIALIZER;
 
