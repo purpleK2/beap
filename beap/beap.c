@@ -25,10 +25,6 @@ typedef struct slub_cache {
 } slub_cache;
 
 static block_header *free_list = NULL;
-static beap_page_alloc_func alloc_page = NULL;
-static beap_page_free_func free_page = NULL;
-static beap_lock_func lock = NULL;
-static beap_unlock_func unlock = NULL;
 static int lock_held = 0; // Track if we're already holding the lock
 
 // SLUB cache array
@@ -37,28 +33,22 @@ static int num_caches = 0;
 
 static void safe_lock() {
   if (!lock_held) {
-    lock();
+    beap_lock();
     lock_held = 1;
   }
 }
 
 static void safe_unlock() {
   if (lock_held) {
-    unlock();
+    beap_unlock();
     lock_held = 0;
   }
 }
 
-void beap_init(beap_page_alloc_func alloc, beap_page_free_func free,
-               beap_lock_func lock_func, beap_unlock_func unlock_func) {
-  lock_func(); // Initial lock is safe as we're initializing
+void beap_init() {
+  beap_lock(); // Initial lock is safe as we're initializing
 
-  lock = lock_func;
-  unlock = unlock_func;
   lock_held = 1; // Track that we now hold the lock
-
-  alloc_page = alloc;
-  free_page = free;
 
   num_caches = 0;
 
@@ -72,7 +62,7 @@ void beap_init(beap_page_alloc_func alloc, beap_page_free_func free,
     num_caches++;
     size *= 2;
   }
-  unlock_func();
+  beap_unlock();
   lock_held = 0; // Track that we released the lock
 }
 
@@ -90,11 +80,8 @@ static slub_cache *find_cache(size_t size) {
 // Allocate a new page for the cache and divide it into objects
 static int refill_cache(slub_cache *cache) {
   // Don't lock here as the caller should already hold the lock
-  if (!alloc_page) {
-    return 0;
-  }
 
-  void *page_mem = alloc_page();
+  void *page_mem = beap_alloc_page();
   if (!page_mem) {
     return 0;
   }
@@ -152,10 +139,10 @@ void *beap_memcpy(void *dest, const void *src, size_t n) {
   return dest;
 }
 
-void *FUNC_PREFIX(malloc)(size_t size) {
+void *BEAP_PREFIX(malloc)(size_t size) {
   safe_lock();
   // Align the size to 8 bytes
-  size = ALIGN8(size);
+  size = BEAP_ALIGN8(size);
 
   // For small allocations, use SLUB cache
   slub_cache *cache = find_cache(size);
@@ -214,11 +201,7 @@ void *FUNC_PREFIX(malloc)(size_t size) {
     curr = curr->next;
   }
 
-  if (!alloc_page) {
-    safe_unlock();
-    return NULL;
-  }
-  block_header *new_page = (block_header *)alloc_page();
+  block_header *new_page = (block_header *)beap_alloc_page();
   if (!new_page) {
     safe_unlock();
     return NULL;
@@ -229,7 +212,7 @@ void *FUNC_PREFIX(malloc)(size_t size) {
   free_list = new_page;
 
   safe_unlock();
-  return FUNC_PREFIX(malloc)(size);
+  return BEAP_PREFIX(malloc)(size);
 }
 
 // Helper function to check if a pointer belongs to a SLUB cache
@@ -253,7 +236,7 @@ static slub_cache *get_cache_for_ptr(void *ptr) {
   return NULL;
 }
 
-void FUNC_PREFIX(free)(void *ptr) {
+void BEAP_PREFIX(free)(void *ptr) {
   safe_lock();
   if (!ptr) {
     safe_unlock();
@@ -280,21 +263,21 @@ void FUNC_PREFIX(free)(void *ptr) {
   safe_unlock();
 }
 
-void *FUNC_PREFIX(calloc)(size_t num, size_t size) {
+void *BEAP_PREFIX(calloc)(size_t num, size_t size) {
   // Don't acquire lock here since malloc will handle locking
   size_t total_size = num * size;
-  void *ptr = FUNC_PREFIX(malloc)(total_size);
+  void *ptr = BEAP_PREFIX(malloc)(total_size);
   if (ptr) {
     beap_memset(ptr, 0, total_size);
   }
   return ptr;
 }
 
-void *FUNC_PREFIX(realloc)(void *ptr, size_t size) {
+void *BEAP_PREFIX(realloc)(void *ptr, size_t size) {
   if (!ptr)
-    return FUNC_PREFIX(malloc)(size);
+    return BEAP_PREFIX(malloc)(size);
   if (size == 0) {
-    FUNC_PREFIX(free)(ptr);
+    BEAP_PREFIX(free)(ptr);
     return NULL;
   }
 
@@ -310,12 +293,12 @@ void *FUNC_PREFIX(realloc)(void *ptr, size_t size) {
     } else {
       safe_unlock();
       // Allocate new space and copy data
-      void *new_ptr = FUNC_PREFIX(malloc)(size);
+      void *new_ptr = BEAP_PREFIX(malloc)(size);
       if (new_ptr) {
         safe_lock();
         beap_memcpy(new_ptr, ptr, cache->obj_size);
         safe_unlock();
-        FUNC_PREFIX(free)(ptr);
+        BEAP_PREFIX(free)(ptr);
       }
       return new_ptr;
     }
@@ -330,12 +313,12 @@ void *FUNC_PREFIX(realloc)(void *ptr, size_t size) {
 
   safe_unlock();
 
-  void *new_ptr = FUNC_PREFIX(malloc)(size);
+  void *new_ptr = BEAP_PREFIX(malloc)(size);
   if (new_ptr) {
     safe_lock();
     beap_memcpy(new_ptr, ptr, old_block->size);
     safe_unlock();
-    FUNC_PREFIX(free)(ptr);
+    BEAP_PREFIX(free)(ptr);
   }
   return new_ptr;
 }
