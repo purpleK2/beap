@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "beap.h"
 #include "tlsf.h"
 
 #if defined(__cplusplus)
@@ -860,8 +861,11 @@ int tlsf_check(tlsf_t tlsf) {
 
 static void default_walker(void *ptr, size_t size, int used, void *user) {
     (void)user;
-    printf("\t%p %s size: %x (%p)\n", ptr, used ? "used" : "free",
-           (unsigned int)size, block_from_ptr(ptr));
+
+#ifdef BEAP_DEBUG
+    beap_debug("\t%p %s size: %x (%p)\n", ptr, used ? "used" : "free",
+               (unsigned int)size, block_from_ptr(ptr));
+#endif
 }
 
 void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void *user) {
@@ -934,36 +938,49 @@ pool_t tlsf_extend_pool(tlsf_t tlsf, void *mem, size_t bytes, size_t incr) {
     const size_t pool_bytes    = align_down(bytes - pool_overhead, ALIGN_SIZE);
 
     if (((ptrdiff_t)mem % ALIGN_SIZE) != 0) {
-        printf("tlsf_extend_pool: Memory must be aligned by %u bytes.\n",
-               (unsigned int)ALIGN_SIZE);
+
+#ifdef BEAP_DEBUG
+        beap_debug("tlsf_extend_pool: Memory must be aligned by %u bytes.\n",
+                   (unsigned int)ALIGN_SIZE);
+#endif
+
         return 0;
     }
 
     if (pool_bytes < block_size_min || pool_bytes > block_size_max) {
 #if defined(TLSF_64BIT)
-        printf("tlsf_extend_pool: Memory size must be between 0x%x and 0x%x00 "
-               "bytes.\n",
-               (unsigned int)(pool_overhead + block_size_min),
-               (unsigned int)((pool_overhead + block_size_max) / 256));
-#else
-        printf(
-            "tlsf_extend_pool: Memory size must be between %u and %u bytes.\n",
+#ifdef BEAP_DEBUG
+        beap_debug(
+            "tlsf_extend_pool: Memory size must be between 0x%x and 0x%x00 "
+            "bytes.\n",
             (unsigned int)(pool_overhead + block_size_min),
-            (unsigned int)(pool_overhead + block_size_max));
+            (unsigned int)((pool_overhead + block_size_max) / 256));
+#endif
+#else
+#ifdef BEAP_DEBUG
+        beap_debug("tlsf_extend_pool: Memory size must be between %u and %u "
+                   "bytes.\n",
+                   (unsigned int)(pool_overhead + block_size_min),
+                   (unsigned int)(pool_overhead + block_size_max));
+#endif
 #endif
         return 0;
     }
 
     if (incr > 0 && incr < tlsf_block_size_min()) {
-        printf("tlsf_extend_pool: Increased size must be at least %u bytes.\n",
-               (unsigned int)tlsf_block_size_min());
+#ifdef BEAP_DEBUG
+        beap_debug(
+            "tlsf_extend_pool: Increased size must be at least %u bytes.\n",
+            (unsigned int)tlsf_block_size_min());
+#endif
         return 0;
     }
 
     if (incr == 0) /* Initialize the pool */
     {
         /*
-        ** Create the main free block. Offset the start of the block slightly
+        ** Create the main free block. Offset the start of the block
+        *slightly
         ** so that the prev_phys_block field falls outside of the pool -
         ** it will never be used.
         */
@@ -1040,7 +1057,9 @@ int test_ffs_fls() {
 #endif
 
     if (rv) {
-        printf("test_ffs_fls: %x ffs/fls tests failed.\n", rv);
+#ifndef BEAP_DEBUG
+        beap_debug("test_ffs_fls: %x ffs/fls tests failed.\n", rv);
+#endif
     }
     return rv;
 }
@@ -1054,8 +1073,10 @@ tlsf_t tlsf_create(void *mem) {
 #endif
 
     if (((tlsfptr_t)mem % ALIGN_SIZE) != 0) {
-        printf("tlsf_create: Memory must be aligned to %u bytes.\n",
-               (unsigned int)ALIGN_SIZE);
+#ifdef BEAP_DEBUG
+        beap_debug("tlsf_create: Memory must be aligned to %u bytes.\n",
+                   (unsigned int)ALIGN_SIZE);
+#endif
         return 0;
     }
 

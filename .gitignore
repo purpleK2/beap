@@ -49,3 +49,6 @@ build
 
 # executable output
 beap_test
+
+compile_commands.json
+.cache

@@ -1,4 +1,5 @@
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,18 +8,29 @@
 
 #include <beap.h>
 
+#ifdef BEAP_DEBUG
+void beap_debug(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+}
+#endif
+
 static pthread_mutex_t allocator_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void *beap_alloc_pages(size_t pages) {
     // Using mmap to allocate memory, aligned to the page boundary
     size_t page_size = sysconf(_SC_PAGE_SIZE);
-    void *addr       = mmap(NULL, pages * page_size, PROT_READ | PROT_WRITE,
-                            MAP_ANON | MAP_PRIVATE, -1, 0);
+    printf("Allocating %zu pages (%zu bytes)\n", pages, pages * page_size);
+    void *addr = mmap(NULL, pages * page_size, PROT_READ | PROT_WRITE,
+                      MAP_ANON | MAP_PRIVATE, -1, 0);
     return addr == MAP_FAILED ? NULL : addr;
 }
 
 void beap_free_pages(void *ptr, size_t pages) {
     size_t page_size = sysconf(_SC_PAGE_SIZE);
+    printf("Freeing %zu pages (%zu bytes)\n", pages, pages * page_size);
     munmap(ptr, pages * page_size);
 }
 
@@ -116,5 +128,6 @@ int main(int argc, char **argv) {
     printf("%s", str);
 
     kfree(str);
+    printf("a");
     free(pool);
 }

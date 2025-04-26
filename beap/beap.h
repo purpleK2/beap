@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #define BEAP_PAGE_SIZE     4096
-#define BEAP_INITIAL_PAGES 64 // 64 * 4KiB = 256 KiB
+#define BEAP_INITIAL_PAGES 1 // 1 * 4KiB = 4 KiB
 
 #define PREFIX(x) k##x
 
@@ -21,6 +21,9 @@ extern void *beap_alloc_pages(size_t pages);
 extern void beap_free_pages(void *page, size_t pages);
 extern void beap_lock(void);
 extern void beap_unlock(void);
+#ifdef BEAP_DEBUG
+extern void beap_debug(const char *fmt, ...);
+#endif
 
 // functions
 void tlsf_beap_init(void);
